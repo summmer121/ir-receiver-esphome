@@ -10,8 +10,6 @@
 ESP8266/ESP-12E based IR/RF receiver for Home Assistant.
 
 
-https://github.com/summmer121/ir-receiver-esphome/blob/main/img/ha%E8%87%AA%E5%8A%A8%E5%8C%96.jpg
-https://github.com/summmer121/ir-receiver-esphome/blob/main/img/web%E7%95%8C%E9%9D%A2.jpg
 ### Features
 
 - Receives **RCSwitch raw codes** on D2/GPIO4
@@ -99,8 +97,7 @@ Flash using ESPHome web dashboard or `esphome upload`.
 
 基于 ESP8266/ESP-12E 的红外/射频接收器，接入 Home Assistant。
 
-https://github.com/summmer121/ir-receiver-esphome/blob/main/img/ha%E8%87%AA%E5%8A%A8%E5%8C%96.jpg
-https://github.com/summmer121/ir-receiver-esphome/blob/main/img/web%E7%95%8C%E9%9D%A2.jpg
+
 ### 功能特性
 
 - 在 **D2/GPIO4** 接收 **RCSwitch Raw** 信号
