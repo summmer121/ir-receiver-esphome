@@ -111,9 +111,6 @@ remote_receiver:
           id(g_last_code) = code;
           id(ts_last_code).publish_state(code);
 
-          id(g_last_value) = "";
-          id(ts_last_value).publish_state("");
-
           std::string val = ir_keymap::get(code);
           if (val.empty()) {
             id(ts_current_kv).publish_state("（无映射）");
@@ -124,6 +121,8 @@ remote_receiver:
             id(ts_result).publish_state("已配对: " + code + " → " + val);
             id(g_last_value) = val;
             id(ts_last_value).publish_state(val);
+            id(g_press_counter) += 1;
+            id(ts_press_counter).publish_state(std::to_string(id(g_press_counter)).c_str());
             ESP_LOGI("ir", "PAIRED key=%s value=%s full=%s", code.c_str(), val.c_str(), full_code.c_str());
             if (mqtt::global_mqtt_client != nullptr && mqtt::global_mqtt_client->is_connected()) {
               bool ok_key = mqtt::global_mqtt_client->publish("ir_receiver/key", code, 0, false);
@@ -152,9 +151,6 @@ remote_receiver:
           id(g_last_code) = code;
           id(ts_last_code).publish_state(code);
 
-          id(g_last_value) = "";
-          id(ts_last_value).publish_state("");
-
           std::string val = ir_keymap::get(code);
           if (val.empty()) {
             id(ts_current_kv).publish_state("（无映射）");
@@ -165,6 +161,8 @@ remote_receiver:
             id(ts_result).publish_state("已配对: " + code + " → " + val);
             id(g_last_value) = val;
             id(ts_last_value).publish_state(val);
+            id(g_press_counter) += 1;
+            id(ts_press_counter).publish_state(std::to_string(id(g_press_counter)).c_str());
             ESP_LOGI("ir", "PAIRED key=%s value=%s", code.c_str(), val.c_str());
             if (mqtt::global_mqtt_client != nullptr && mqtt::global_mqtt_client->is_connected()) {
               bool ok_key = mqtt::global_mqtt_client->publish("ir_receiver/key", code, 0, false);
@@ -187,6 +185,10 @@ globals:
     restore_value: no
     initial_value: '""'
   - id: g_last_ir_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+  - id: g_press_counter
     type: uint32_t
     restore_value: no
     initial_value: '0'
@@ -240,6 +242,12 @@ text_sensor:
     name: "最近值 lastvalue"
     id: ts_last_value
     icon: mdi:tag-text
+    update_interval: never
+
+  - platform: template
+    name: "按键计数 presscount"
+    id: ts_press_counter
+    icon: mdi:counter
     update_interval: never
 
   - platform: template
