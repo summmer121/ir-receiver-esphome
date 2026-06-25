@@ -101,6 +101,9 @@ remote_receiver:
           id(g_last_code) = code;
           id(ts_last_code).publish_state(code);
 
+          id(g_last_value) = "";
+          id(ts_last_value).publish_state("");
+
           std::string val = ir_keymap::get(code);
           if (val.empty()) {
             id(ts_current_kv).publish_state("（无映射）");
@@ -131,6 +134,9 @@ remote_receiver:
 
           id(g_last_code) = code;
           id(ts_last_code).publish_state(code);
+
+          id(g_last_value) = "";
+          id(ts_last_value).publish_state("");
 
           std::string val = ir_keymap::get(code);
           if (val.empty()) {
