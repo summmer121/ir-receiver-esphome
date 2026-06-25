@@ -74,9 +74,9 @@ Use these topics in **Home Assistant automations**.
 | Control | Function |
 |---------|----------|
 | IR Code (text) | Auto-fills with received IR code / manual input |
-| Value (text) | Mapped value to save |
-| Save Mapping | Save key/value to persistent storage |
-| Delete Mapping | Remove a saved mapping |
+| Value (text) | Mapped value to save (auto-fills if matched) |
+| Save Mapping | Save key/value to persistent storage (both required) |
+| Delete Mapping | Remove by **key** or **value** — enter either |
 | List All | Show all saved mappings |
 | Last Value | Display the **value** of the most recently matched key (for automation triggers) |
 | Press Counter | Increments on every matched key press (for HA automation triggers) |
@@ -161,9 +161,9 @@ ota_password: "OTA密码"
 | 控件 | 功能 |
 |------|------|
 | 红外码 ircode | 自动填入接收的红外码 / 手动输入 |
-| 键值 value | 要保存的映射值 |
-| 保存映射 save | 保存键值到持久存储（SPIFFS） |
-| 删除映射 delete | 删除指定映射 |
+| 键值 value | 映射值（匹配时自动填入） |
+| 保存映射 save | 必须红外码和键值都不为空才能保存 |
+| 删除映射 delete | 输入 **key** 或 **value** 任意一个匹配即删除 |
 | 列出所有映射 listall | 显示所有已保存映射 |
 | 最近值 lastvalue | 显示最近一次匹配到的 **value**（方便自动化触发） |
 | 按键计数 presscount | 每次匹配成功自动 +1（用于 HA 自动化触发） |
