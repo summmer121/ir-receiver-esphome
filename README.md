@@ -18,6 +18,7 @@ ESP8266/ESP-12E based IR/RF receiver for Home Assistant.
 - Publishes matched events to MQTT:
   - `ir_receiver/key` — raw received key
   - `ir_receiver/value` — mapped value
+- Adds **last_value** text sensor for direct Home Assistant automation triggers
 - **No MQTT publish** for unpaired keys (value not found)
 
 ### Hardware
@@ -75,6 +76,7 @@ Use these topics in **Home Assistant automations**.
 | Save Mapping | Save key/value to persistent storage |
 | Delete Mapping | Remove a saved mapping |
 | List All | Show all saved mappings |
+| Last Value | Display the **value** of the most recently matched key (for automation triggers) |
 | MQTT Server / Port / Username / Password | Configure MQTT broker |
 | Reboot Device | Restart to apply MQTT changes |
 
@@ -100,6 +102,7 @@ Flash using ESPHome web dashboard or `esphome upload`.
 - 仅当 key 匹配到 value 时向 MQTT 发送：
   - `ir_receiver/key` — 原始红外码
   - `ir_receiver/value` — 映射值
+- 新增 **last_value** 文本传感器，方便直接在 Home Assistant 自动化中触发
 - **未匹配的 key 不发送 MQTT**，避免垃圾消息
 
 ### 硬件信息
@@ -157,6 +160,7 @@ ota_password: "OTA密码"
 | 保存映射 save | 保存键值到持久存储（SPIFFS） |
 | 删除映射 delete | 删除指定映射 |
 | 列出所有映射 listall | 显示所有已保存映射 |
+| 最近值 lastvalue | 显示最近一次匹配到的 **value**（方便自动化触发） |
 | MQTT服务器/端口/用户名/密码 | 配置 MQTT 转发参数 |
 | 重启设备 reboot | 重启使 MQTT 配置生效 |
 
