@@ -110,6 +110,9 @@ remote_receiver:
 
           id(g_last_code) = code;
           id(ts_last_code).publish_state(code);
+          auto call_code = id(ti_ir_code).make_call();
+          call_code.set_value(code);
+          call_code.perform();
 
           std::string val = ir_keymap::get(code);
           if (val.empty()) {
@@ -150,6 +153,9 @@ remote_receiver:
 
           id(g_last_code) = code;
           id(ts_last_code).publish_state(code);
+          auto call_code = id(ti_ir_code).make_call();
+          call_code.set_value(code);
+          call_code.perform();
 
           std::string val = ir_keymap::get(code);
           if (val.empty()) {
@@ -380,24 +386,6 @@ button:
   - platform: restart
     name: "重启设备 reboot"
     id: btn_reboot
-
-  - platform: template
-    name: "填入最近红外码 fill"
-    id: btn_fill
-    icon: mdi:arrow-down-bold
-    on_press:
-      then:
-        - lambda: |-
-            std::string code = id(g_last_code);
-            if (code.empty()) {
-              id(ts_result).publish_state("还没收到红外信号");
-              ESP_LOGW("ir", "Fill requested but no IR code received yet");
-              return;
-            }
-            id(ts_last_code).publish_state(code);
-            auto call = id(ti_ir_code).make_call();
-            call.set_value(code);
-            call.perform();
 
   - platform: template
     name: "保存映射 save"
