@@ -109,6 +109,8 @@ remote_receiver:
           } else {
             id(ts_current_kv).publish_state(code + " → " + val);
             id(ts_result).publish_state("已配对: " + code + " → " + val);
+            id(g_last_value) = val;
+            id(ts_last_value).publish_state(val);
             ESP_LOGI("ir", "PAIRED key=%s value=%s full=%s", code.c_str(), val.c_str(), full_code.c_str());
             if (mqtt::global_mqtt_client != nullptr && mqtt::global_mqtt_client->is_connected()) {
               bool ok_key = mqtt::global_mqtt_client->publish("ir_receiver/key", code, 0, false);
@@ -138,6 +140,8 @@ remote_receiver:
           } else {
             id(ts_current_kv).publish_state(code + " → " + val);
             id(ts_result).publish_state("已配对: " + code + " → " + val);
+            id(g_last_value) = val;
+            id(ts_last_value).publish_state(val);
             ESP_LOGI("ir", "PAIRED key=%s value=%s", code.c_str(), val.c_str());
             if (mqtt::global_mqtt_client != nullptr && mqtt::global_mqtt_client->is_connected()) {
               bool ok_key = mqtt::global_mqtt_client->publish("ir_receiver/key", code, 0, false);
@@ -152,6 +156,10 @@ remote_receiver:
 # ── 全局变量 ──────────────────────────────────────────
 globals:
   - id: g_last_code
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+  - id: g_last_value
     type: std::string
     restore_value: no
     initial_value: '""'
@@ -199,6 +207,12 @@ text_sensor:
     name: "当前键值 current"
     id: ts_current_kv
     icon: mdi:table-key
+    update_interval: never
+
+  - platform: template
+    name: "最近值 lastvalue"
+    id: ts_last_value
+    icon: mdi:tag-text
     update_interval: never
 
   - platform: template
