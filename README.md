@@ -18,10 +18,9 @@ ESP8266/ESP-12E based IR/RF receiver for Home Assistant.
 - Publishes matched events to MQTT:
   - `ir_receiver/key` — raw received key
   - `ir_receiver/value` — mapped value
-- Adds **last_value** text sensor for direct Home Assistant automation triggers
-  - Clears to empty on every new IR signal, then updates to matched value
-  - Guarantees state change even when pressing the same key repeatedly
-- **No MQTT publish** for unpaired keys (value not found)
+- Adds **press_counter** text sensor for reliable Home Assistant automation triggers (increments on every matched key press)
+- Auto-fills received IR code into the **ircode** text box (no manual fill button needed)
+- Clean MQTT: only publishes `ir_receiver/key` and `ir_receiver/value`
 
 ### Hardware
 
@@ -52,7 +51,7 @@ ota_password: "your_ota_password"
 
 3. Compile and upload with ESPHome.
 4. Access the device web UI or Home Assistant to:
-   - Press **Fill Latest IR Code** to capture a received code
+   - **Press any remote button** — the IR code automatically appears in the IR Code box
    - Enter a **Value** (e.g., `off`, `time`, `channel_1`)
    - Press **Save Mapping** to persist it to SPIFFS
    - Enter MQTT broker settings and reboot to enable MQTT forwarding
@@ -72,13 +71,13 @@ Use these topics in **Home Assistant automations**.
 
 | Control | Function |
 |---------|----------|
-| Fill Latest IR Code | Fill input with last received code |
-| IR Code (text) | Manual IR code input / display |
+| IR Code (text) | Auto-fills with received IR code / manual input |
 | Value (text) | Mapped value to save |
 | Save Mapping | Save key/value to persistent storage |
 | Delete Mapping | Remove a saved mapping |
 | List All | Show all saved mappings |
 | Last Value | Display the **value** of the most recently matched key (for automation triggers) |
+| Press Counter | Increments on every matched key press (for HA automation triggers) |
 | MQTT Server / Port / Username / Password | Configure MQTT broker |
 | Reboot Device | Restart to apply MQTT changes |
 
@@ -104,9 +103,8 @@ Flash using ESPHome web dashboard or `esphome upload`.
 - 仅当 key 匹配到 value 时向 MQTT 发送：
   - `ir_receiver/key` — 原始红外码
   - `ir_receiver/value` — 映射值
-- 新增 **last_value** 文本传感器，方便直接在 Home Assistant 自动化中触发
-  - 每次收到红外信号先清空为空字符串，再更新为匹配到的 value
-  - 保证连续按同一个按键也能触发 HA 状态变化
+- 新增 **按键计数 presscount** 传感器，每次匹配成功自动 +1，用于 Home Assistant 自动化触发
+- **红外码自动填入**：收到红外信号后自动填入"红外码"文本框，无需手动点击
 - **未匹配的 key 不发送 MQTT**，避免垃圾消息
 
 ### 硬件信息
@@ -138,7 +136,7 @@ ota_password: "OTA密码"
 
 3. 用 ESPHome 编译并上传。
 4. 打开设备网页或 Home Assistant：
-   - 点 **填入最近红外码** 捕获刚收到的信号
+   - **按遥控器任意键** — 红外码自动填入框中
    - 输入 **键值**（如 `off`、`time`、`channel_1`）
    - 点 **保存映射** 写入持久存储
    - 输入 MQTT 服务器地址、端口、用户名、密码后 **重启设备** 生效
@@ -158,13 +156,13 @@ ota_password: "OTA密码"
 
 | 控件 | 功能 |
 |------|------|
-| 填入最近红外码 fill | 自动填入最后接收的红外码 |
-| 红外码 ircode | 手动输入或显示红外码 |
+| 红外码 ircode | 自动填入接收的红外码 / 手动输入 |
 | 键值 value | 要保存的映射值 |
 | 保存映射 save | 保存键值到持久存储（SPIFFS） |
 | 删除映射 delete | 删除指定映射 |
 | 列出所有映射 listall | 显示所有已保存映射 |
 | 最近值 lastvalue | 显示最近一次匹配到的 **value**（方便自动化触发） |
+| 按键计数 presscount | 每次匹配成功自动 +1（用于 HA 自动化触发） |
 | MQTT服务器/端口/用户名/密码 | 配置 MQTT 转发参数 |
 | 重启设备 reboot | 重启使 MQTT 配置生效 |
 
