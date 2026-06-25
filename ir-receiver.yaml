@@ -72,6 +72,9 @@ mqtt:
   password: ""
   topic_prefix: ir_receiver
   enable_on_boot: false
+  discovery: false
+  birth_message: ~
+  will_message: ~
 
 web_server:
   port: 80
@@ -95,6 +98,13 @@ remote_receiver:
   on_rc_switch:
     then:
       - lambda: |-
+          uint32_t now = millis();
+          if (now - id(g_last_ir_ms) < 500) {
+            ESP_LOGD("ir", "Debounce: skip IR signal (%.0f ms since last)", (now - id(g_last_ir_ms)));
+            return;
+          }
+          id(g_last_ir_ms) = now;
+
           std::string code = ir_keymap::uint64_to_bin(x.code);
           std::string full_code = "RCSWITCH:" + std::to_string(x.protocol) + ":" + code;
 
@@ -128,6 +138,13 @@ remote_receiver:
   on_nec:
     then:
       - lambda: |-
+          uint32_t now = millis();
+          if (now - id(g_last_ir_ms) < 500) {
+            ESP_LOGD("ir", "Debounce: skip IR signal (%.0f ms since last)", (now - id(g_last_ir_ms)));
+            return;
+          }
+          id(g_last_ir_ms) = now;
+
           char buf[40];
           snprintf(buf, sizeof(buf), "NEC:%04X:%04X", x.address, x.command);
           std::string code = buf;
@@ -169,6 +186,10 @@ globals:
     type: std::string
     restore_value: no
     initial_value: '""'
+  - id: g_last_ir_ms
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
   - id: g_keymap_store
     type: std::string
     restore_value: yes
