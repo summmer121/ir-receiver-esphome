@@ -139,6 +139,14 @@ namespace ir_keymap {
     return "";
   }
 
+  std::string find_key_by_value(const std::string& raw_value) {
+    std::string value = trim(raw_value);
+    for (auto& kv : cache) {
+      if (kv.second == value) return kv.first;
+    }
+    return "";
+  }
+
   bool set_cache(const std::string& raw_code, const std::string& raw_value) {
     std::string code = trim(raw_code);
     std::string value = trim(raw_value);

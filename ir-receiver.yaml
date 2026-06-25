@@ -432,21 +432,30 @@ button:
     on_press:
       then:
         - lambda: |-
-            std::string code = ir_keymap::trim(id(ti_ir_code).state);
-            if (code.empty()) {
-              id(ts_result).publish_state("错误：红外码为空");
+            std::string input = ir_keymap::trim(id(ti_ir_code).state);
+            if (input.empty()) input = ir_keymap::trim(id(ti_value).state);
+            if (input.empty()) {
+              id(ts_result).publish_state("错误：红外码和键值均为空");
               return;
             }
-            bool removed = ir_keymap::remove(code);
+            bool removed = ir_keymap::remove(input);
+            std::string deleted_key = input;
+            if (!removed) {
+              std::string key_by_val = ir_keymap::find_key_by_value(input);
+              if (!key_by_val.empty()) {
+                removed = ir_keymap::remove(key_by_val);
+                deleted_key = key_by_val;
+              }
+            }
             if (removed) {
               id(g_keymap_store) = ir_keymap::to_blob();
-              id(ts_result).publish_state("已从SPIFFS删除: " + code);
+              id(ts_result).publish_state("已从SPIFFS删除: " + deleted_key);
               id(ts_current_kv).publish_state("（无映射）");
               id(ts_list_all).publish_state(ir_keymap::summary());
             } else {
-              id(ts_result).publish_state("不存在: " + code);
+              id(ts_result).publish_state("不存在: " + input);
             }
-            ESP_LOGI("keymap", "Delete key=%s found=%d", code.c_str(), removed);
+            ESP_LOGI("keymap", "Delete input=%s key=%s found=%d", input.c_str(), deleted_key.c_str(), removed);
 
   - platform: template
     name: "列出所有映射 listall"
