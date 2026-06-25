@@ -1,49 +1,173 @@
-# ESPHome IR Receiver
+# ESPHome IR Receiver / ESPHome 红外接收器
+
+[English](#english) | [中文](#chinese)
+
+---
+
+<a name="english"></a>
+## English
 
 ESP8266/ESP-12E based IR/RF receiver for Home Assistant.
 
-Features:
+### Features
 
-- Receives RCSwitch raw codes on D2/GPIO4.
-- Learns key/value mappings from ESPHome web/API controls.
-- Persists mappings to ESP8266 SPIFFS at `/keymap.txt` so reboot does not lose mappings.
-- MQTT configuration is entered from web controls and restored from flash.
-- Publishes only matched events to MQTT:
-  - `ir_receiver/key`
-  - `ir_receiver/value`
-- If a received key has no mapped value, MQTT is not published.
+- Receives **RCSwitch raw codes** on D2/GPIO4
+- Learns key/value mappings from ESPHome web/API controls
+- Persists mappings to ESP8266 SPIFFS at `/keymap.txt` — **survives reboots**
+- MQTT configuration via web controls, restored from flash on boot
+- Publishes matched events to MQTT:
+  - `ir_receiver/key` — raw received key
+  - `ir_receiver/value` — mapped value
+- **No MQTT publish** for unpaired keys (value not found)
 
-## Files
+### Hardware
 
-- `ir-receiver.yaml` — ESPHome node configuration.
-- `ir_keymap.h` — C++ helper for mapping persistence and lookup.
+| Component | Pin |
+|-----------|-----|
+| Development Board | **ESP8266 ESP-12E** (NodeMCU compatible) |
+| IR/RF Receiver Data | **D2 = GPIO4** |
+| Power | 3.3V / USB |
 
-## Usage
+### Files
 
-1. Put both files in your ESPHome config directory.
+| File | Description |
+|------|-------------|
+| `ir-receiver.yaml` | ESPHome node configuration |
+| `ir_keymap.h` | C++ helper for mapping persistence and lookup |
+
+### Quick Start
+
+1. Copy both files to your ESPHome config directory.
 2. Add secrets in `secrets.yaml`:
 
 ```yaml
-wifi_ssid: your_wifi
-wifi_password: your_password
-api_encryption_key: your_api_key
-ota_password: your_ota_password
+wifi_ssid: "your_wifi"
+wifi_password: "your_password"
+api_encryption_key: "your_api_key"
+ota_password: "your_ota_password"
 ```
 
-3. Compile/upload with ESPHome.
-4. Use the web/API controls to:
-   - Fill latest received code.
-   - Enter value.
-   - Save mapping.
-   - Configure MQTT broker/port/user/password and reboot.
+3. Compile and upload with ESPHome.
+4. Access the device web UI or Home Assistant to:
+   - Press **Fill Latest IR Code** to capture a received code
+   - Enter a **Value** (e.g., `off`, `time`, `channel_1`)
+   - Press **Save Mapping** to persist it to SPIFFS
+   - Enter MQTT broker settings and reboot to enable MQTT forwarding
 
-## MQTT payloads
+### MQTT Payloads
 
 When a received code has a saved value:
 
-```text
-ir_receiver/key    -> raw key, e.g. 11011000000
-ir_receiver/value  -> mapped value, e.g. off
+| Topic | Example Payload |
+|-------|-----------------|
+| `ir_receiver/key` | `11011000000` |
+| `ir_receiver/value` | `off` |
+
+Use these topics in **Home Assistant automations**.
+
+### Web UI Controls
+
+| Control | Function |
+|---------|----------|
+| Fill Latest IR Code | Fill input with last received code |
+| IR Code (text) | Manual IR code input / display |
+| Value (text) | Mapped value to save |
+| Save Mapping | Save key/value to persistent storage |
+| Delete Mapping | Remove a saved mapping |
+| List All | Show all saved mappings |
+| MQTT Server / Port / Username / Password | Configure MQTT broker |
+| Reboot Device | Restart to apply MQTT changes |
+
+### Firmware (Pre-built Binary)
+
+Download the latest OTA binary from [Releases](https://github.com/summmer121/ir-receiver-esphome/releases).
+
+Flash using ESPHome web dashboard or `esphome upload`.
+
+---
+
+<a name="chinese"></a>
+## 中文
+
+基于 ESP8266/ESP-12E 的红外/射频接收器，接入 Home Assistant。
+
+### 功能特性
+
+- 在 **D2/GPIO4** 接收 **RCSwitch Raw** 信号
+- 通过 ESPHome 网页/API 学习键值映射
+- 映射保存到 ESP8266 SPIFFS `/keymap.txt` — **重启不丢失**
+- MQTT 配置通过网页输入，重启后从 Flash 自动恢复
+- 仅当 key 匹配到 value 时向 MQTT 发送：
+  - `ir_receiver/key` — 原始红外码
+  - `ir_receiver/value` — 映射值
+- **未匹配的 key 不发送 MQTT**，避免垃圾消息
+
+### 硬件信息
+
+| 组件 | 引脚 |
+|------|------|
+| 开发板 | **ESP8266 ESP-12E**（NodeMCU 兼容） |
+| 红外/射频接收数据脚 | **D2 = GPIO4** |
+| 供电 | 3.3V / USB |
+
+### 文件说明
+
+| 文件 | 说明 |
+|------|------|
+| `ir-receiver.yaml` | ESPHome 主配置文件 |
+| `ir_keymap.h` | C++ 映射持久化和查找库 |
+
+### 快速开始
+
+1. 将两个文件放到 ESPHome 配置目录。
+2. 在 `secrets.yaml` 中添加密钥：
+
+```yaml
+wifi_ssid: "你的WiFi"
+wifi_password: "WiFi密码"
+api_encryption_key: "API密钥"
+ota_password: "OTA密码"
 ```
 
-These topics are intended for Home Assistant automations.
+3. 用 ESPHome 编译并上传。
+4. 打开设备网页或 Home Assistant：
+   - 点 **填入最近红外码** 捕获刚收到的信号
+   - 输入 **键值**（如 `off`、`time`、`channel_1`）
+   - 点 **保存映射** 写入持久存储
+   - 输入 MQTT 服务器地址、端口、用户名、密码后 **重启设备** 生效
+
+### MQTT 数据格式
+
+当接收到的红外码已保存映射时：
+
+| 主题 | 示例内容 |
+|------|----------|
+| `ir_receiver/key` | `11011000000` |
+| `ir_receiver/value` | `off` |
+
+在 **Home Assistant 自动化** 中监听这两个主题即可触发动作。
+
+### 网页控制说明
+
+| 控件 | 功能 |
+|------|------|
+| 填入最近红外码 fill | 自动填入最后接收的红外码 |
+| 红外码 ircode | 手动输入或显示红外码 |
+| 键值 value | 要保存的映射值 |
+| 保存映射 save | 保存键值到持久存储（SPIFFS） |
+| 删除映射 delete | 删除指定映射 |
+| 列出所有映射 listall | 显示所有已保存映射 |
+| MQTT服务器/端口/用户名/密码 | 配置 MQTT 转发参数 |
+| 重启设备 reboot | 重启使 MQTT 配置生效 |
+
+### 固件（预编译二进制）
+
+从 [Releases](https://github.com/summmer121/ir-receiver-esphome/releases) 下载最新 OTA 固件。
+
+通过 ESPHome 网页面板或 `esphome upload` 刷入。
+
+---
+
+## License
+
+MIT
