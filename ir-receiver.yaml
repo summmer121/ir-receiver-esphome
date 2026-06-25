@@ -1,0 +1,414 @@
+esphome:
+  name: ir-receiver
+  includes:
+    - ir_keymap.h
+  platformio_options:
+    board_build.filesystem: spiffs
+    board_build.ldscript: eagle.flash.4m1m.ld
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          ir_keymap::load_fs();
+          ir_keymap::migrate_from_blob_if_needed(id(g_keymap_store));
+          id(ts_list_all).publish_state(ir_keymap::summary());
+          id(ts_result).publish_state("启动完成，已从SPIFFS加载 " + std::to_string(ir_keymap::size()) + " 条映射");
+
+          // MQTT 网页输入项使用 restore_value 写入 Flash，重启后自动恢复
+          id(g_mqtt_broker) = ir_keymap::trim(id(ti_mqtt_broker).state);
+          id(g_mqtt_username) = ir_keymap::trim(id(ti_mqtt_username).state);
+          id(g_mqtt_password) = id(ti_mqtt_password).state;
+          int port = atoi(id(ti_mqtt_port).state.c_str());
+          id(g_mqtt_port) = (port > 0 && port < 65536) ? port : 1883;
+          id(g_mqtt_enabled) = !id(g_mqtt_broker).empty();
+
+          if (mqtt::global_mqtt_client != nullptr) {
+            if (id(g_mqtt_enabled)) {
+              mqtt::global_mqtt_client->set_broker_address(id(g_mqtt_broker));
+              mqtt::global_mqtt_client->set_broker_port(id(g_mqtt_port));
+              mqtt::global_mqtt_client->set_username(id(g_mqtt_username));
+              mqtt::global_mqtt_client->set_password(id(g_mqtt_password));
+              mqtt::global_mqtt_client->enable();
+              ESP_LOGI("mqtt_cfg", "MQTT loaded from flash: %s:%d", id(g_mqtt_broker).c_str(), id(g_mqtt_port));
+            } else {
+              mqtt::global_mqtt_client->disable();
+              ESP_LOGI("mqtt_cfg", "MQTT disabled: broker not configured");
+            }
+          }
+
+esp8266:
+  board: esp12e
+  framework:
+    version: recommended
+  # 允许 template text 的 restore_value 和 ESPHome Preferences 写入 Flash
+  restore_from_flash: true
+
+# 加快持久化写入，保存后很快落盘；避免刚保存就断电导致丢失
+preferences:
+  flash_write_interval: 1s
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "IR-Fallback"
+
+captive_portal:
+
+logger:
+  level: DEBUG
+
+api:
+
+ota:
+  - platform: esphome
+  - platform: web_server
+
+# MQTT 默认不写死：先禁用，网页填写 broker 后重启会从 Flash 恢复并启用
+mqtt:
+  broker: 127.0.0.1
+  port: 1883
+  username: ""
+  password: ""
+  topic_prefix: ir_receiver
+  enable_on_boot: false
+
+web_server:
+  port: 80
+
+# ── 红外接收：D2 = GPIO4 ───────────────────────────────
+remote_receiver:
+  pin:
+    number: GPIO4
+    inverted: true
+    mode:
+      input: true
+      pullup: true
+  dump:
+    - rc_switch
+  tolerance: 50%
+  filter: 250us
+  idle: 25ms
+  buffer_size: 2kb
+
+  # 你的日志显示实际协议是 RCSwitch Raw: data='11011000000'
+  on_rc_switch:
+    then:
+      - lambda: |-
+          std::string code = ir_keymap::uint64_to_bin(x.code);
+          std::string full_code = "RCSWITCH:" + std::to_string(x.protocol) + ":" + code;
+
+          id(g_last_code) = code;
+          id(ts_last_code).publish_state(code);
+
+          std::string val = ir_keymap::get(code);
+          if (val.empty()) {
+            id(ts_current_kv).publish_state("（无映射）");
+            id(ts_result).publish_state("收到未映射红外码: " + code);
+            ESP_LOGI("ir", "UNPAIRED key=%s full=%s", code.c_str(), full_code.c_str());
+          } else {
+            id(ts_current_kv).publish_state(code + " → " + val);
+            id(ts_result).publish_state("已配对: " + code + " → " + val);
+            ESP_LOGI("ir", "PAIRED key=%s value=%s full=%s", code.c_str(), val.c_str(), full_code.c_str());
+            if (mqtt::global_mqtt_client != nullptr && mqtt::global_mqtt_client->is_connected()) {
+              bool ok_key = mqtt::global_mqtt_client->publish("ir_receiver/key", code, 0, false);
+              bool ok_val = mqtt::global_mqtt_client->publish("ir_receiver/value", val, 0, false);
+              ESP_LOGI("mqtt_ir", "Published key/value: key=%s value=%s ok=%d/%d", code.c_str(), val.c_str(), ok_key, ok_val);
+            } else {
+              ESP_LOGW("mqtt_ir", "MQTT not connected, skip publish key=%s value=%s", code.c_str(), val.c_str());
+            }
+          }
+          ESP_LOGI("ir", "Received RCSwitch protocol=%u key=%s", x.protocol, code.c_str());
+
+  on_nec:
+    then:
+      - lambda: |-
+          char buf[40];
+          snprintf(buf, sizeof(buf), "NEC:%04X:%04X", x.address, x.command);
+          std::string code = buf;
+
+          id(g_last_code) = code;
+          id(ts_last_code).publish_state(code);
+
+          std::string val = ir_keymap::get(code);
+          if (val.empty()) {
+            id(ts_current_kv).publish_state("（无映射）");
+            id(ts_result).publish_state("收到未映射红外码: " + code);
+            ESP_LOGI("ir", "UNPAIRED key=%s", code.c_str());
+          } else {
+            id(ts_current_kv).publish_state(code + " → " + val);
+            id(ts_result).publish_state("已配对: " + code + " → " + val);
+            ESP_LOGI("ir", "PAIRED key=%s value=%s", code.c_str(), val.c_str());
+            if (mqtt::global_mqtt_client != nullptr && mqtt::global_mqtt_client->is_connected()) {
+              bool ok_key = mqtt::global_mqtt_client->publish("ir_receiver/key", code, 0, false);
+              bool ok_val = mqtt::global_mqtt_client->publish("ir_receiver/value", val, 0, false);
+              ESP_LOGI("mqtt_ir", "Published key/value: key=%s value=%s ok=%d/%d", code.c_str(), val.c_str(), ok_key, ok_val);
+            } else {
+              ESP_LOGW("mqtt_ir", "MQTT not connected, skip publish key=%s value=%s", code.c_str(), val.c_str());
+            }
+          }
+          ESP_LOGI("ir", "Received %s", code.c_str());
+
+# ── 全局变量 ──────────────────────────────────────────
+globals:
+  - id: g_last_code
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+  - id: g_keymap_store
+    type: std::string
+    restore_value: yes
+    max_restore_data_length: 254
+    initial_value: '""'
+  - id: g_mqtt_broker
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+  - id: g_mqtt_port
+    type: int
+    restore_value: no
+    initial_value: '1883'
+  - id: g_mqtt_username
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+  - id: g_mqtt_password
+    type: std::string
+    restore_value: no
+    initial_value: '""'
+  - id: g_mqtt_enabled
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+# ── 传感器：显示状态 ──────────────────────────────────
+text_sensor:
+  - platform: template
+    name: "最近红外码 lastcode"
+    id: ts_last_code
+    icon: mdi:remote
+    update_interval: never
+
+  - platform: template
+    name: "操作结果 result"
+    id: ts_result
+    icon: mdi:information-outline
+    update_interval: never
+
+  - platform: template
+    name: "当前键值 current"
+    id: ts_current_kv
+    icon: mdi:table-key
+    update_interval: never
+
+  - platform: template
+    name: "所有映射 listall"
+    id: ts_list_all
+    icon: mdi:format-list-bulleted
+    update_interval: never
+
+  - platform: template
+    name: "MQTT状态 mqtt_status"
+    id: ts_mqtt_status
+    icon: mdi:lan-connect
+    update_interval: 10s
+    lambda: |-
+      if (!id(g_mqtt_enabled) || id(g_mqtt_broker).empty()) {
+        return std::string("未配置");
+      }
+      if (mqtt::global_mqtt_client != nullptr && mqtt::global_mqtt_client->is_connected()) {
+        return std::string("已连接: ") + id(g_mqtt_broker) + ":" + std::to_string(id(g_mqtt_port));
+      }
+      return std::string("未连接: ") + id(g_mqtt_broker) + ":" + std::to_string(id(g_mqtt_port));
+
+# ── 输入框 ────────────────────────────────────────────
+text:
+  - platform: template
+    name: "红外码 ircode"
+    id: ti_ir_code
+    mode: text
+    optimistic: true
+    min_length: 0
+    max_length: 64
+    initial_value: ""
+    icon: mdi:barcode
+    on_value:
+      then:
+        - lambda: |-
+            std::string code = ir_keymap::trim(x);
+            if (!code.empty()) {
+              std::string val = ir_keymap::get(code);
+              if (val.empty()) {
+                id(ts_current_kv).publish_state("（无映射）");
+                id(ts_result).publish_state("未配对: " + code);
+                ESP_LOGI("keymap", "UNPAIRED key=%s", code.c_str());
+              } else {
+                id(ts_current_kv).publish_state(code + " → " + val);
+                id(ts_result).publish_state("已配对: " + code + " → " + val);
+                ESP_LOGI("keymap", "PAIRED key=%s value=%s", code.c_str(), val.c_str());
+              }
+            }
+
+  - platform: template
+    name: "键值 value"
+    id: ti_value
+    mode: text
+    optimistic: true
+    min_length: 0
+    max_length: 128
+    initial_value: ""
+    icon: mdi:pencil
+
+  - platform: template
+    name: "MQTT服务器 mqtt_broker"
+    id: ti_mqtt_broker
+    mode: text
+    optimistic: true
+    restore_value: true
+    min_length: 0
+    max_length: 64
+    initial_value: ""
+    icon: mdi:server
+    on_value:
+      then:
+        - lambda: |-
+            id(g_mqtt_broker) = ir_keymap::trim(x);
+            id(g_mqtt_enabled) = !id(g_mqtt_broker).empty();
+            id(ts_mqtt_status).publish_state(id(g_mqtt_enabled) ? ("已保存到Flash，重启后生效: " + id(g_mqtt_broker)) : "未配置");
+            ESP_LOGI("mqtt_cfg", "Broker saved to flash: %s; reboot required to apply", id(g_mqtt_broker).c_str());
+
+  - platform: template
+    name: "MQTT端口 mqtt_port"
+    id: ti_mqtt_port
+    mode: text
+    optimistic: true
+    restore_value: true
+    min_length: 0
+    max_length: 5
+    initial_value: "1883"
+    icon: mdi:numeric
+    on_value:
+      then:
+        - lambda: |-
+            int port = atoi(x.c_str());
+            if (port > 0 && port < 65536) id(g_mqtt_port) = port;
+            ESP_LOGI("mqtt_cfg", "Port saved to flash: %d; reboot required to apply", id(g_mqtt_port));
+
+  - platform: template
+    name: "MQTT用户名 mqtt_username"
+    id: ti_mqtt_username
+    mode: text
+    optimistic: true
+    restore_value: true
+    min_length: 0
+    max_length: 64
+    initial_value: ""
+    icon: mdi:account
+    on_value:
+      then:
+        - lambda: |-
+            id(g_mqtt_username) = ir_keymap::trim(x);
+            ESP_LOGI("mqtt_cfg", "Username saved to flash; reboot required to apply");
+
+  - platform: template
+    name: "MQTT密码 mqtt_password"
+    id: ti_mqtt_password
+    mode: password
+    optimistic: true
+    restore_value: true
+    min_length: 0
+    max_length: 64
+    initial_value: ""
+    icon: mdi:key
+    on_value:
+      then:
+        - lambda: |-
+            id(g_mqtt_password) = x;
+            ESP_LOGI("mqtt_cfg", "Password saved to flash; reboot required to apply");
+
+# ── 按钮 ──────────────────────────────────────────────
+button:
+  - platform: restart
+    name: "重启设备 reboot"
+    id: btn_reboot
+
+  - platform: template
+    name: "填入最近红外码 fill"
+    id: btn_fill
+    icon: mdi:arrow-down-bold
+    on_press:
+      then:
+        - lambda: |-
+            std::string code = id(g_last_code);
+            if (code.empty()) {
+              id(ts_result).publish_state("还没收到红外信号");
+              ESP_LOGW("ir", "Fill requested but no IR code received yet");
+              return;
+            }
+            id(ts_last_code).publish_state(code);
+            auto call = id(ti_ir_code).make_call();
+            call.set_value(code);
+            call.perform();
+
+  - platform: template
+    name: "保存映射 save"
+    id: btn_save
+    icon: mdi:content-save
+    on_press:
+      then:
+        - lambda: |-
+            std::string code = ir_keymap::trim(id(ti_ir_code).state);
+            std::string val  = ir_keymap::trim(id(ti_value).state);
+            if (code.empty()) {
+              id(ts_result).publish_state("错误：红外码为空");
+              return;
+            }
+            if (val.empty()) {
+              id(ts_result).publish_state("错误：Value 为空");
+              return;
+            }
+            bool ok = ir_keymap::set(code, val);
+            if (ok) {
+              id(g_keymap_store) = ir_keymap::to_blob();
+              id(ts_result).publish_state("已保存到SPIFFS: " + code + " → " + val);
+            } else {
+              id(ts_result).publish_state("保存失败：SPIFFS写入失败");
+            }
+            id(ts_current_kv).publish_state(code + " → " + val);
+            id(ts_list_all).publish_state(ir_keymap::summary());
+            ESP_LOGI("keymap", "Saved/PAIRED key=%s value=%s spiffs=%s", code.c_str(), val.c_str(), ok ? "OK" : "FAILED");
+
+  - platform: template
+    name: "删除映射 delete"
+    id: btn_delete
+    icon: mdi:delete
+    on_press:
+      then:
+        - lambda: |-
+            std::string code = ir_keymap::trim(id(ti_ir_code).state);
+            if (code.empty()) {
+              id(ts_result).publish_state("错误：红外码为空");
+              return;
+            }
+            bool removed = ir_keymap::remove(code);
+            if (removed) {
+              id(g_keymap_store) = ir_keymap::to_blob();
+              id(ts_result).publish_state("已从SPIFFS删除: " + code);
+              id(ts_current_kv).publish_state("（无映射）");
+              id(ts_list_all).publish_state(ir_keymap::summary());
+            } else {
+              id(ts_result).publish_state("不存在: " + code);
+            }
+            ESP_LOGI("keymap", "Delete key=%s found=%d", code.c_str(), removed);
+
+  - platform: template
+    name: "列出所有映射 listall"
+    id: btn_list
+    icon: mdi:format-list-bulleted
+    on_press:
+      then:
+        - lambda: |-
+            std::string list = ir_keymap::summary();
+            id(ts_list_all).publish_state(list);
+            id(ts_result).publish_state("已列出映射，共 " + std::to_string(ir_keymap::size()) + " 条，完整内容见日志");
+            ir_keymap::log_all();
