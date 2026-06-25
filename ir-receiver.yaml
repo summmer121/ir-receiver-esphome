@@ -115,11 +115,16 @@ remote_receiver:
           call_code.perform();
 
           std::string val = ir_keymap::get(code);
+          auto call_val = id(ti_value).make_call();
           if (val.empty()) {
+            call_val.set_value("unknow");
+            call_val.perform();
             id(ts_current_kv).publish_state("（无映射）");
             id(ts_result).publish_state("收到未映射红外码: " + code);
             ESP_LOGI("ir", "UNPAIRED key=%s full=%s", code.c_str(), full_code.c_str());
           } else {
+            call_val.set_value(val);
+            call_val.perform();
             id(ts_current_kv).publish_state(code + " → " + val);
             id(ts_result).publish_state("已配对: " + code + " → " + val);
             id(g_last_value) = val;
@@ -158,11 +163,16 @@ remote_receiver:
           call_code.perform();
 
           std::string val = ir_keymap::get(code);
+          auto call_val = id(ti_value).make_call();
           if (val.empty()) {
+            call_val.set_value("unknow");
+            call_val.perform();
             id(ts_current_kv).publish_state("（无映射）");
             id(ts_result).publish_state("收到未映射红外码: " + code);
             ESP_LOGI("ir", "UNPAIRED key=%s", code.c_str());
           } else {
+            call_val.set_value(val);
+            call_val.perform();
             id(ts_current_kv).publish_state(code + " → " + val);
             id(ts_result).publish_state("已配对: " + code + " → " + val);
             id(g_last_value) = val;
