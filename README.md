@@ -19,6 +19,8 @@ ESP8266/ESP-12E based IR/RF receiver for Home Assistant.
   - `ir_receiver/key` — raw received key
   - `ir_receiver/value` — mapped value
 - Adds **last_value** text sensor for direct Home Assistant automation triggers
+  - Clears to empty on every new IR signal, then updates to matched value
+  - Guarantees state change even when pressing the same key repeatedly
 - **No MQTT publish** for unpaired keys (value not found)
 
 ### Hardware
@@ -103,6 +105,8 @@ Flash using ESPHome web dashboard or `esphome upload`.
   - `ir_receiver/key` — 原始红外码
   - `ir_receiver/value` — 映射值
 - 新增 **last_value** 文本传感器，方便直接在 Home Assistant 自动化中触发
+  - 每次收到红外信号先清空为空字符串，再更新为匹配到的 value
+  - 保证连续按同一个按键也能触发 HA 状态变化
 - **未匹配的 key 不发送 MQTT**，避免垃圾消息
 
 ### 硬件信息
